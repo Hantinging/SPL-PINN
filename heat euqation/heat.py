@@ -23,7 +23,6 @@ from sklearn.metrics import mean_squared_error
 from sklearn.metrics import r2_score
 
 
-# 模型搭建
 class Net(nn.Module):
     def __init__(self, NN): 
         super(Net, self).__init__()
@@ -41,13 +40,13 @@ class Net(nn.Module):
         return out_final
 
 def pde(x, net):
-    u = net(x)  # 网络得到的数据
+    u = net(x) 
     u_tx = torch.autograd.grad(u, x, grad_outputs=torch.ones_like(net(x)),
-                               create_graph=True, allow_unused=True)[0]  # 求偏导数
+                               create_graph=True, allow_unused=True)[0]  
     d_t = u_tx[:, 0].unsqueeze(-1)
     d_x = u_tx[:, 1].unsqueeze(-1)
     u_xx = torch.autograd.grad(d_x, x, grad_outputs=torch.ones_like(d_x),
-                               create_graph=True, allow_unused=True)[0][:,1].unsqueeze(-1)  # 求偏导数
+                               create_graph=True, allow_unused=True)[0][:,1].unsqueeze(-1) 
 
     #w = torch.tensor(0.01 / np.pi)
 
