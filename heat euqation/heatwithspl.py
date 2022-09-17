@@ -22,19 +22,16 @@ from sklearn.metrics import mean_squared_error
 from sklearn.metrics import r2_score
 
 
-# 模型搭建
 class Net(nn.Module):
-    def __init__(self, NN): # NL n个l（线性，全连接）隐藏层， NN 输入数据的维数， 128 256
-        # NL是有多少层隐藏层
-        # NN是每层的神经元数量
+    def __init__(self, NN): 
         super(Net, self).__init__()
 
         self.input_layer = nn.Linear(2, NN)
-        self.hidden_layer1 = nn.Linear(NN,int(NN/2)) ## 原文这里用NN，我这里用的下采样，经过实验验证，“等采样”更优
-        self.hidden_layer2 = nn.Linear(int(NN/2), int(NN/2))  ## 原文这里用NN，我这里用的下采样，经过实验验证，“等采样”更优
+        self.hidden_layer1 = nn.Linear(NN,int(NN/2)) 
+        self.hidden_layer2 = nn.Linear(int(NN/2), int(NN/2))  
         self.output_layer = nn.Linear(int(NN / 2), 1)
 
-    def forward(self, x): # 一种特殊的方法 __call__() 回调
+    def forward(self, x):
         out = torch.tanh(self.input_layer(x))
         out = torch.tanh(self.hidden_layer1(out))
         out = torch.tanh(self.hidden_layer2(out))
@@ -42,17 +39,17 @@ class Net(nn.Module):
         return out_final
 
 def pde(x, net):
-    u = net(x)  # 网络得到的数据
+    u = net(x)  
     u_tx = torch.autograd.grad(u, x, grad_outputs=torch.ones_like(net(x)),
-                               create_graph=True, allow_unused=True)[0]  # 求偏导数
+                               create_graph=True, allow_unused=True)[0]  
     d_t = u_tx[:, 0].unsqueeze(-1)
     d_x = u_tx[:, 1].unsqueeze(-1)
     u_xx = torch.autograd.grad(d_x, x, grad_outputs=torch.ones_like(d_x),
-                               create_graph=True, allow_unused=True)[0][:,1].unsqueeze(-1)  # 求偏导数
+                               create_graph=True, allow_unused=True)[0][:,1].unsqueeze(-1)  
 
     #w = torch.tensor(0.01 / np.pi)
 
-    return d_t - u_xx  # 公式（1）
+    return d_t - u_xx  
 
 
 class SPLLoss(nn.NLLLoss):
@@ -83,7 +80,6 @@ def setup():
     random.seed(seed)
 
 def draw_loss(Loss_list,epoch):
-    # 我这里迭代了200次，所以x的取值范围为(0，200)，然后再将每次相对应的准确率以及损失率附在x上
     plt.cla()
     x1 = range(1, epoch+1)
     y1 = Loss_list
@@ -121,27 +117,26 @@ def train():
 
         for index, pt_x_bc_var, pt_t_bc_zeros, pt_u_bc_sin, pt_x_in_pos_one, pt_x_in_neg_one, pt_t_in_var, \
            pt_u_in_zeros, pt_x_collocation, pt_t_collocation, pt_all_zeros in tqdm.tqdm(dataloader):
-            optimizer.zero_grad()  # 梯度归0
+            optimizer.zero_grad()  
 
-            net_bc_out = net(torch.cat([pt_t_bc_zeros, pt_x_bc_var], 1))  # u(x,t)的输出
-            mse_u_2 = criterion(net_bc_out, pt_u_bc_sin, index)  # e = u(x,t)-(-sin(pi*x))  公式（2）
+            net_bc_out = net(torch.cat([pt_t_bc_zeros, pt_x_bc_var], 1))  
+            mse_u_2 = criterion(net_bc_out, pt_u_bc_sin, index) 
 
-            net_bc_inr = net(torch.cat([pt_t_in_var, pt_x_in_pos_one], 1))  # 0=u(t,1) 公式（3)
-            net_bc_inl = net(torch.cat([pt_t_in_var, pt_x_in_neg_one], 1))  # 0=u(t,-1) 公式（4）
+            net_bc_inr = net(torch.cat([pt_t_in_var, pt_x_in_pos_one], 1))
+            net_bc_inl = net(torch.cat([pt_t_in_var, pt_x_in_neg_one], 1))
 
-            mse_u_3 = criterion(net_bc_inr, pt_u_in_zeros, index)  # e = 0-u(t,1) 公式(3)
-            mse_u_4 = criterion(net_bc_inl, pt_u_in_zeros, index)  # e = 0-u(t,-1) 公式（4）
+            mse_u_3 = criterion(net_bc_inr, pt_u_in_zeros, index)  
+            mse_u_4 = criterion(net_bc_inl, pt_u_in_zeros, index) 
 
-            # 求PDE函数式的误差
-            # 将变量x,t带入公式（1）
+
             f_out = pde(torch.cat([pt_t_collocation, pt_x_collocation], 1), net)  # output of f(x,t) 公式（1）
             mse_f_1 = criterion(f_out, pt_all_zeros, index)
 
-            # 将误差(损失)累加起来
+          
             loss = mse_f_1 + mse_u_2 + mse_u_3 + mse_u_4
 
-            loss.backward()  # 反向传播
-            optimizer.step()  # This is equivalent to : theta_new = theta_old - alpha * derivative of J w.r.t theta
+            loss.backward()  
+            optimizer.step()  
 
             train_loss += loss.item()
 
@@ -151,30 +146,28 @@ def train():
         net.eval()
         for index, pt_x_bc_var, pt_t_bc_zeros, pt_u_bc_sin, pt_x_in_pos_one, pt_x_in_neg_one, pt_t_in_var, \
            pt_u_in_zeros, pt_x_collocation, pt_t_collocation, pt_all_zeros in tqdm.tqdm(testloader):
-            net_bc_out = net(torch.cat([pt_t_bc_zeros, pt_x_bc_var], 1))  # u(x,t)的输出
-            mse_u_2 = criterion(net_bc_out, pt_u_bc_sin, index)  # e = u(x,t)-(-sin(pi*x))  公式（2）
+            net_bc_out = net(torch.cat([pt_t_bc_zeros, pt_x_bc_var], 1)) 
+            mse_u_2 = criterion(net_bc_out, pt_u_bc_sin, index)  
 
-            net_bc_inr = net(torch.cat([pt_t_in_var, pt_x_in_pos_one], 1))  # 0=u(t,1) 公式（3)
-            net_bc_inl = net(torch.cat([pt_t_in_var, pt_x_in_neg_one], 1))  # 0=u(t,-1) 公式（4）
+            net_bc_inr = net(torch.cat([pt_t_in_var, pt_x_in_pos_one], 1)) 
+            net_bc_inl = net(torch.cat([pt_t_in_var, pt_x_in_neg_one], 1)) 
 
-            mse_u_3 = criterion(net_bc_inr, pt_u_in_zeros, index)  # e = 0-u(t,1) 公式(3)
-            mse_u_4 = criterion(net_bc_inl, pt_u_in_zeros, index)  # e = 0-u(t,-1) 公式（4）
+            mse_u_3 = criterion(net_bc_inr, pt_u_in_zeros, index)  
+            mse_u_4 = criterion(net_bc_inl, pt_u_in_zeros, index)  
 
-            # 求PDE函数式的误差
-            # 将变量x,t带入公式（1）
+
             f_out = pde(torch.cat([pt_t_collocation, pt_x_collocation], 1), net)  # output of f(x,t) 公式（1）
             mse_f_1 = criterion(f_out, pt_all_zeros, index)
 
-            # 将误差(损失)累加起来
             loss = mse_f_1 + mse_u_2 + mse_u_3 + mse_u_4
 
             eval_loss += loss.item()
-            # 早停止
+
         early_stopping(eval_loss, net)
-        # 达到早停止条件时，early_stop会被置为True
+
         if early_stopping.early_stop:
             print("Early stopping")
-            break  # 跳出迭代，结束训练
+            break  
 
         eval_losses.append(eval_loss/2000)
 
